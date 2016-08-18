@@ -13,13 +13,16 @@ List of all of requests for the file mypage.html
 Examples of usage:
 
 This will filter by IP:
-`logscope.py c:\access.log --ip 127.0.0.1 -b2008,9,17,12,30,0`
+```shell
+logscope.py c:\access.log --ip 127.0.0.1 -b2008,9,17,12,30,0
+```
 
 This will filter by text:
-```bash
+```shell
 logscope.py c:\access.log --text get_data
 ```
-```
+
+```shell
 # logscope.py c:\access.log --ip 127.0.0.2
 # logscope.py c:\access.log --resp 404
 # logscope.py c:\access.log -b2008,7,3,8,30,0 -e2008,7,3,14,30,0
