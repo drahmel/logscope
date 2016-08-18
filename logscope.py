@@ -14,6 +14,7 @@
 # logscope.py c:\logfilter.txt -t add_member_account
 # logscope.py c:\logfilter.txt -i 204.108.100.244 -o c:\session_jddavid18.log
 #
+
 import re, datetime, xml.dom.minidom,os
 from time import strftime
 from optparse import OptionParser
@@ -45,7 +46,7 @@ class logscope:
         junkLine = '[main]aksdjalksjd ka jsdlkaj sdkj'
 
         # Expressions to parse Apache logs
-        exprFinal = r'(?P<ip>\d+\.\d+\.\d+\.\d+) (?P<ident>[^ ]*) (?P<user>[^ ]*) \[(?P<date>[^\]]*)\] "(?P<req>[^"]*)" (?P<resp>\d+) (?P<respSize>[^ ]*)(?P<other>.*)'
+        exprFinal = r'[^0-9]*(?P<ip>\d+\.\d+\.\d+\.\d+) (?P<ident>[^ ]*) (?P<user>[^ ]*) \[(?P<date>[^\]]*)\] "(?P<req>[^"]*)" (?P<resp>\d+) (?P<respSize>[^ ]*)(?P<other>.*)'
 
         # Compile regular expression
         prog = re.compile(exprFinal)
@@ -79,7 +80,12 @@ class logscope:
                 print "Can't read from file %s: %s" % (logFile, str(why))
                 return
 
+            count = 0
+            limitLines = None
             for line in f:
+                if limitLines and count > limitLines:
+                    break
+                count += 1
                 result = prog.match(line)
                 if result:
                     row = result.groupdict()
@@ -133,8 +139,8 @@ class logscope:
                         if inAttr.has_key('outfile'):
                             outStr += line.strip() + "\n"
                         else:
-                        print line.strip() #a.strftime("%y%m%d-%H:%M"),row
-                        matches += 1
+                            print line.strip() #a.strftime("%y%m%d-%H:%M"),row
+                            matches += 1
                     i += 1
                 else:
                     notLogLine +=1
@@ -171,6 +177,8 @@ class logscope:
             attr['rtext']=options.rtext
         if options.quietmode:
             attr['quietmode']=1
+        if options.numlines:
+            attr['numlines']=options.numlines
 
         print attr
         #self.apacheParse({'ip':'127.0.0.2','resp':'404','bdate':'2008,7,1,15,15,0','edate':'2008,7,1,16,30,00'})
@@ -188,6 +196,7 @@ if __name__ == '__main__':
     parser.add_option("-r", "--resp", dest="resp", help="Response type(200,404,etc.) for filter", metavar="RESP")
     parser.add_option("-t", "--text", dest="rtext", help="Respone text (filename,GET,POST) for filter", metavar="rtext")
     parser.add_option("-q", "--quiet",action="store_true", dest="quietmode", default=False,help="Turn off extra messages")
+    parser.add_option("-n", "--num",action="store_true", dest="numlines", default=False,help="Limit to specified number of lines")
     (options, args) = parser.parse_args()
     logParse.run(options,args)
 
