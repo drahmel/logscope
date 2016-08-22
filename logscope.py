@@ -15,6 +15,11 @@
 # logscope.py c:\logfilter.txt -i 204.108.100.244 -o c:\session_jddavid18.log
 #
 
+# Sample Apache log lines
+#apacheLine1 = '127.0.0.1 - frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326 "http://www.example.com/start.html" "Mozilla/4.08 [en] (Win98; I ;Nav)"'
+#apacheLine2 = '127.0.0.1 - - [01/Jun/2008:17:47:05 -0700] "GET /poc_web/lameloop.php HTTP/1.1" 200 146'
+#junkLine = '[main]aksdjalksjd ka jsdlkaj sdkj'
+
 def prRed(prt): print("\033[91m {}\033[00m" .format(prt))
 def prGreen(prt): print("\033[92m {}\033[00m" .format(prt))
 def prYellow(prt): print("\033[93m {}\033[00m" .format(prt))
@@ -49,18 +54,12 @@ class logscope:
         # For the datetime parsing
         months = {'Jan':1, 'Feb':2, 'Mar':3, 'Apr':4, 'May':5, 'Jun':6, 'Jul':7,'Aug':8,'Sep':9,'Oct':10,'Nov':11,'Dec':12}
 
-        # Sample Apache log lines
-        apacheLine1 = '127.0.0.1 - frank [10/Oct/2000:13:55:36 -0700] "GET /apache_pb.gif HTTP/1.0" 200 2326 "http://www.example.com/start.html" "Mozilla/4.08 [en] (Win98; I ;Nav)"'
-        apacheLine2 = '127.0.0.1 - - [01/Jun/2008:17:47:05 -0700] "GET /poc_web/lameloop.php HTTP/1.1" 200 146'
-        junkLine = '[main]aksdjalksjd ka jsdlkaj sdkj'
-
         # Expressions to parse Apache logs
         exprFinal = r'[^0-9]*(?P<ip>\d+\.\d+\.\d+\.\d+) (?P<ident>[^ ]*) (?P<user>[^ ]*) \[(?P<date>[^\]]*)\] "(?P<req>[^"]*)" (?P<resp>\d+) (?P<respSize>[^ ]*)(?P<other>.*)'
 
         # Compile regular expression
         prog = re.compile(exprFinal)
 
-        i = 0
         matches = 0
         notLogLine = 0
         outStr = ''
@@ -87,7 +86,7 @@ class logscope:
 
             count = 0
             limitLines = False
-            for line in f:
+            for i, line in enumerate(f):
                 if limitLines and count > limitLines:
                     break
                 count += 1
@@ -114,7 +113,6 @@ class logscope:
                     notLogLine +=1
                     #print line
                     exampleBad = line
-                i += 1
             f.close()
         if inAttr.has_key('outfile'):
             try:
