@@ -15,6 +15,15 @@
 # logscope.py c:\logfilter.txt -i 204.108.100.244 -o c:\session_jddavid18.log
 #
 
+def prRed(prt): print("\033[91m {}\033[00m" .format(prt))
+def prGreen(prt): print("\033[92m {}\033[00m" .format(prt))
+def prYellow(prt): print("\033[93m {}\033[00m" .format(prt))
+def prLightPurple(prt): print("\033[94m {}\033[00m" .format(prt))
+def prPurple(prt): print("\033[95m {}\033[00m" .format(prt))
+def prCyan(prt): print("\033[96m {}\033[00m" .format(prt))
+def prLightGray(prt): print("\033[97m {}\033[00m" .format(prt))
+def prBlack(prt): print("\033[98m {}\033[00m" .format(prt))
+
 import re, datetime, xml.dom.minidom,os
 from time import strftime
 from optparse import OptionParser
@@ -73,6 +82,8 @@ class logscope:
             matchDates = True
 
         logFileList = logFileStr.split(",")
+        exampleGood = False
+        exampleBad = False
         for logFile in logFileList:
             try:
                 f = open(logFile,'r')
@@ -81,13 +92,19 @@ class logscope:
                 return
 
             count = 0
-            limitLines = None
+            limitLines = 400
             for line in f:
                 if limitLines and count > limitLines:
                     break
                 count += 1
+                # If log file is a combined log, it will have a denotation of the origin log followed by a :
+                combinedMatch =  re.search(": \d+\.\d+\.\d+\.\d+", line)
+                if combinedMatch:
+                    # Shave off log anotation
+                    line = line[(combinedMatch.start()+2):]
                 result = prog.match(line)
                 if result:
+                    exampleGood = line
                     row = result.groupdict()
                     checksum = ''
                     if matchIP:
@@ -144,6 +161,8 @@ class logscope:
                     i += 1
                 else:
                     notLogLine +=1
+                    #print line
+                    exampleBad = line
             f.close()
         if inAttr.has_key('outfile'):
             try:
@@ -154,6 +173,10 @@ class logscope:
                 print "Can't read from file %s: %s" % (logFile, str(why))
                 return
         print "Total lines:"+str(i+notLogLine)+" Total log lines:"+str(i)+" Total matches:"+str(matches)
+        if exampleGood:
+            prGreen("Example good: " + exampleGood)
+        if exampleBad:
+            prRed(" Example bad: " + exampleBad)
 
     def run(self,options,args):
         print "--- LogScope, revision #"+self.getRev()+" --- "
