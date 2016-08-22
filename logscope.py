@@ -66,20 +66,14 @@ class logscope:
         outStr = ''
         fileList = {}
         # Setup fast boolean checks
-        matchIP = False
-        matchResp = False
-        matchRText = False
-        matchDates = False
-        if inAttr.has_key('ip'):
-            matchIP = True
-        if inAttr.has_key('resp'):
-            matchResp = True
+        self.matchIP = True if inAttr.has_key('ip') else False
+        self.matchResp = True if inAttr.has_key('resp') else False
+        self.matchDates = True if inAttr.has_key('bdate') or inAttr.has_key('edate') else False
+        self.matchRText = False
         if inAttr.has_key('rtext'):
-            matchRText = True
-            matchRTextStr = inAttr['rtext']
-            matchRTextList = matchRTextStr.split(",")
-        if inAttr.has_key('bdate') or inAttr.has_key('edate'):
-            matchDates = True
+            self.matchRText = True
+            self.matchRTextStr = inAttr['rtext']
+            self.matchRTextList = self.matchRTextStr.split(",")
 
         logFileList = logFileStr.split(",")
         exampleGood = False
@@ -92,64 +86,22 @@ class logscope:
                 return
 
             count = 0
-            limitLines = 400
+            limitLines = False
             for line in f:
                 if limitLines and count > limitLines:
                     break
                 count += 1
+                cleanLine = line
                 # If log file is a combined log, it will have a denotation of the origin log followed by a :
                 combinedMatch =  re.search(": \d+\.\d+\.\d+\.\d+", line)
                 if combinedMatch:
                     # Shave off log anotation
-                    line = line[(combinedMatch.start()+2):]
-                result = prog.match(line)
+                    cleanLine = line[(combinedMatch.start()+2):]
+                result = prog.match(cleanLine)
                 if result:
                     exampleGood = line
                     row = result.groupdict()
-                    checksum = ''
-                    if matchIP:
-                        if row['ip']==inAttr['ip']:
-                            checksum += 'y'
-                        else:
-                            checksum += 'n'
-                    if matchResp:
-                        if row['resp']==inAttr['resp']:
-                            checksum += 'y'
-                        else:
-                            checksum += 'n'
-                    # Check for specified text
-                    if matchRText:
-                        foundMatch = False
-                        for matchStr in matchRTextList:
-                            #if row['req'].find(inAttr['rtext'])!=-1:
-                            if row['req'].find(matchStr)!=-1:
-                                foundMatch = True
-                                break
-                        if foundMatch:
-                            checksum += 'y'
-                        else:
-                            checksum += 'n'
-                    # Check begin and end date
-                    if matchDates:
-                        aDate = row['date']
-                        logDateTime = datetime.datetime(int(aDate[7:11]), months[aDate[3:6]], int(aDate[0:2]), int(aDate[12:14]), int(aDate[15:17]), int(aDate[18:20]))
-                        if inAttr.has_key('bdate'):
-                            dtArray = inAttr['bdate'].split(',');
-                            beginDate = datetime.datetime(int(dtArray[0]), int(dtArray[1]), int(dtArray[2]), int(dtArray[3]), int(dtArray[4]), int(dtArray[5])) #datetime.datetime(2008, 6, 2)
-                            #print beginDate
-                            if logDateTime>=beginDate:
-                                #print logDateTime,beginDate
-                                checksum += 'y'
-                            else:
-                                checksum += 'n'
-                        if inAttr.has_key('edate'):
-                            dtArray = inAttr['edate'].split(',');
-                            endDate = datetime.datetime(int(dtArray[0]), int(dtArray[1]), int(dtArray[2]), int(dtArray[3]), int(dtArray[4]), int(dtArray[5])) #datetime.datetime(2008, 6, 2)
-                            #endDate = datetime.datetime(2008, 7, 15)
-                            if logDateTime<=endDate:
-                                checksum += 'y'
-                            else:
-                                checksum += 'n'
+                    checksum = self.processLine(row)
                     if checksum.find('n')==-1 and len(checksum)>0:
                         aDate = row['date']
                         a = datetime.datetime(int(aDate[7:11]), months[aDate[3:6]], int(aDate[0:2]), int(aDate[12:14]), int(aDate[15:17]), int(aDate[18:20]))
@@ -158,11 +110,11 @@ class logscope:
                         else:
                             print line.strip() #a.strftime("%y%m%d-%H:%M"),row
                             matches += 1
-                    i += 1
                 else:
                     notLogLine +=1
                     #print line
                     exampleBad = line
+                i += 1
             f.close()
         if inAttr.has_key('outfile'):
             try:
@@ -172,11 +124,59 @@ class logscope:
             except (IOError, os.error), why:
                 print "Can't read from file %s: %s" % (logFile, str(why))
                 return
-        print "Total lines:"+str(i+notLogLine)+" Total log lines:"+str(i)+" Total matches:"+str(matches)
+        print "Total lines in file:"+str(i+notLogLine)+" | Valid log lines:"+str(i)+" | Total matches:"+str(matches)
         if exampleGood:
             prGreen("Example good: " + exampleGood)
         if exampleBad:
             prRed(" Example bad: " + exampleBad)
+
+    def processLine(self, row):
+        checksum = ''
+        if self.matchIP:
+            if row['ip']==inAttr['ip']:
+                checksum += 'y'
+            else:
+                checksum += 'n'
+        if self.matchResp:
+            if row['resp']==inAttr['resp']:
+                checksum += 'y'
+            else:
+                checksum += 'n'
+        # Check for specified text
+        if self.matchRText:
+            foundMatch = False
+            for matchStr in self.matchRTextList:
+                #if row['req'].find(inAttr['rtext'])!=-1:
+                if row['req'].find(matchStr)!=-1:
+                    foundMatch = True
+                    break
+            if foundMatch:
+                checksum += 'y'
+            else:
+                checksum += 'n'
+        # Check begin and end date
+        if self.matchDates:
+            aDate = row['date']
+            logDateTime = datetime.datetime(int(aDate[7:11]), months[aDate[3:6]], int(aDate[0:2]), int(aDate[12:14]), int(aDate[15:17]), int(aDate[18:20]))
+            if inAttr.has_key('bdate'):
+                dtArray = inAttr['bdate'].split(',');
+                beginDate = datetime.datetime(int(dtArray[0]), int(dtArray[1]), int(dtArray[2]), int(dtArray[3]), int(dtArray[4]), int(dtArray[5])) #datetime.datetime(2008, 6, 2)
+                #print beginDate
+                if logDateTime>=beginDate:
+                    #print logDateTime,beginDate
+                    checksum += 'y'
+                else:
+                    checksum += 'n'
+            if inAttr.has_key('edate'):
+                dtArray = inAttr['edate'].split(',');
+                endDate = datetime.datetime(int(dtArray[0]), int(dtArray[1]), int(dtArray[2]), int(dtArray[3]), int(dtArray[4]), int(dtArray[5])) #datetime.datetime(2008, 6, 2)
+                #endDate = datetime.datetime(2008, 7, 15)
+                if logDateTime<=endDate:
+                    checksum += 'y'
+                else:
+                    checksum += 'n'
+        return checksum
+
 
     def run(self,options,args):
         print "--- LogScope, revision #"+self.getRev()+" --- "
