@@ -34,6 +34,8 @@ from time import strftime
 from optparse import OptionParser
 from time import strftime
 from datetime import date
+from urlparse import urlparse
+import dateutil.parser
 
 class logscope:
     def report(self,inStr):
@@ -55,11 +57,12 @@ class logscope:
         months = {'Jan':1, 'Feb':2, 'Mar':3, 'Apr':4, 'May':5, 'Jun':6, 'Jul':7,'Aug':8,'Sep':9,'Oct':10,'Nov':11,'Dec':12}
 
         # Expressions to parse Apache logs
-        exprFinal = r'[^0-9]*(?P<ip>\d+\.\d+\.\d+\.\d+) (?P<ident>[^ ]*) (?P<user>[^ ]*) \[(?P<date>[^\]]*)\] "(?P<req>[^"]*)" (?P<resp>\d+) (?P<respSize>[^ ]*)(?P<other>.*)'
+        exprFinal = r'[^0-9]*(?P<ip>\d+\.\d+\.\d+\.\d+) (?P<ident>[^ ]*) (?P<user>[^ ]*) \[(?P<date>[^\]]*)\] "(?P<req>[^"]*)" (?P<resp>\d+) (?P<respSize>[^ ]*) (?P<refer>[^ ]*) "?(?P<agent>[^"]*)"?(?P<other>.*)'
 
         # Compile regular expression
         prog = re.compile(exprFinal)
 
+        limitLines = False #1000
         matches = 0
         notLogLine = 0
         outStr = ''
@@ -68,6 +71,7 @@ class logscope:
         self.matchIP = True if inAttr.has_key('ip') else False
         self.matchResp = True if inAttr.has_key('resp') else False
         self.matchDates = True if inAttr.has_key('bdate') or inAttr.has_key('edate') else False
+        self.matchRefer = True if inAttr.has_key('refer') else False
         self.matchRText = False
         if inAttr.has_key('rtext'):
             self.matchRText = True
@@ -85,7 +89,6 @@ class logscope:
                 return
 
             count = 0
-            limitLines = False
             for i, line in enumerate(f):
                 if limitLines and count > limitLines:
                     break
@@ -98,8 +101,9 @@ class logscope:
                     cleanLine = line[(combinedMatch.start()+2):]
                 result = prog.match(cleanLine)
                 if result:
-                    exampleGood = line
                     row = result.groupdict()
+                    exampleGood = line
+                    exampleGoodRow = row
                     checksum = self.processLine(row)
                     if checksum.find('n')==-1 and len(checksum)>0:
                         aDate = row['date']
@@ -125,10 +129,13 @@ class logscope:
         print "Total lines in file:"+str(i+notLogLine)+" | Valid log lines:"+str(i)+" | Total matches:"+str(matches)
         if exampleGood:
             prGreen("Example good: " + exampleGood)
+            prYellow("Example good row: " + str(exampleGoodRow))
         if exampleBad:
             prRed(" Example bad: " + exampleBad)
 
     def processLine(self, row):
+        if row['date']:
+            row['ts'] = dateutil.parser.parse(row['date'].replace(':',' ',1))
         checksum = ''
         if self.matchIP:
             if row['ip']==inAttr['ip']:
@@ -173,6 +180,14 @@ class logscope:
                     checksum += 'y'
                 else:
                     checksum += 'n'
+        if self.matchRefer:
+            if row['refer'] != '"-"':
+                myUrl = row['req'].replace("GET", "").replace("POST", "").replace("PUT", "").replace("HTTP/1.1","").replace("HTTP/1.0","").strip()
+                o = urlparse(myUrl).path
+                # Ignore refers that are stored in static files
+                if o.find('.') == -1:
+                    checksum += 'y'
+
         return checksum
 
 
@@ -196,6 +211,8 @@ class logscope:
             attr['resp']=options.resp
         if options.rtext:
             attr['rtext']=options.rtext
+        if options.refer:
+            attr['refer']=options.refer
         if options.quietmode:
             attr['quietmode']=1
         if options.numlines:
@@ -216,6 +233,7 @@ if __name__ == '__main__':
     parser.add_option("-i", "--ip", dest="ip",help="IP address or addresses for filter", metavar="FILE")
     parser.add_option("-r", "--resp", dest="resp", help="Response type(200,404,etc.) for filter", metavar="RESP")
     parser.add_option("-t", "--text", dest="rtext", help="Respone text (filename,GET,POST) for filter", metavar="rtext")
+    parser.add_option("-y", "--refer", dest="refer",help="Has referer", metavar="REFER")
     parser.add_option("-q", "--quiet",action="store_true", dest="quietmode", default=False,help="Turn off extra messages")
     parser.add_option("-n", "--num",action="store_true", dest="numlines", default=False,help="Limit to specified number of lines")
     (options, args) = parser.parse_args()
