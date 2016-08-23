@@ -34,10 +34,14 @@ from time import strftime
 from optparse import OptionParser
 from time import strftime
 from datetime import date
+import urllib
 from urlparse import urlparse
 import dateutil.parser
+import hashlib
+import requests
 
 class logscope:
+    baseTimestampInc = 101
     def report(self,inStr):
         print inStr
     def getRev(self):
@@ -62,7 +66,7 @@ class logscope:
         # Compile regular expression
         prog = re.compile(exprFinal)
 
-        limitLines = False #1000
+        limitLines = False #100
         matches = 0
         notLogLine = 0
         outStr = ''
@@ -95,15 +99,19 @@ class logscope:
                 count += 1
                 cleanLine = line
                 # If log file is a combined log, it will have a denotation of the origin log followed by a :
+                hostName = ''
                 combinedMatch =  re.search(": \d+\.\d+\.\d+\.\d+", line)
                 if combinedMatch:
                     # Shave off log anotation
                     cleanLine = line[(combinedMatch.start()+2):]
+                    hostWhole = line[:(combinedMatch.start()+2)].split(":")
+                    hostName = hostWhole[1]
                 result = prog.match(cleanLine)
                 if result:
                     row = result.groupdict()
                     exampleGood = line
                     exampleGoodRow = row
+                    row['hostName'] = hostName
                     checksum = self.processLine(row)
                     if checksum.find('n')==-1 and len(checksum)>0:
                         aDate = row['date']
@@ -111,7 +119,10 @@ class logscope:
                         if inAttr.has_key('outfile'):
                             outStr += line.strip() + "\n"
                         else:
-                            print line.strip() #a.strftime("%y%m%d-%H:%M"),row
+                            #print line.strip()
+                            print ".",
+                            if i % 1000 == 0:
+                                print i
                             matches += 1
                 else:
                     notLogLine +=1
@@ -183,13 +194,14 @@ class logscope:
         if self.matchRefer:
             if row['refer'] != '"-"':
                 myUrl = row['req'].replace("GET", "").replace("POST", "").replace("PUT", "").replace("HTTP/1.1","").replace("HTTP/1.0","").strip()
+                row['url'] = myUrl
                 o = urlparse(myUrl).path
+                row['path'] = o
                 # Ignore refers that are stored in static files
                 if o.find('.') == -1:
                     checksum += 'y'
 
         return checksum
-
 
     def run(self,options,args):
         print "--- LogScope, revision #"+self.getRev()+" --- "
